@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="FND">
+<title>FND Episode Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F8F4FF; min-height: 100vh; }
+  .screen { display: none; flex-direction: column; min-height: 100vh; }
+  .screen.active { display: flex; }
+  .header { background: #7F77DD; padding: 52px 20px 18px; }
+  .header h1 { font-size: 28px; font-weight: 700; color: white; letter-spacing: 3px; }
+  .header .sub { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 3px; }
+  .content { padding: 20px 16px; flex: 1; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+  .section-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+  .ts-box { background: #FFF8E7; border-radius: 14px; padding: 13px 16px; border: 2px solid #FAC775; display: flex; align-items: center; gap: 10px; }
+  .ts-val { font-size: 14px; font-weight: 600; color: #633806; }
+  .btn-group { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+  .cbtn { padding: 10px 18px; border-radius: 24px; border: 2px solid transparent; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 0.1s; user-select: none; }
+  .cbtn:active { transform: scale(0.95); }
+  .cbtn.what { background: #EEEDFE; color: #3C3489; border-color: #AFA9EC; }
+  .cbtn.what.sel { background: #7F77DD; color: white; border-color: #534AB7; }
+  .cbtn.where { background: #E1F5EE; color: #085041; border-color: #5DCAA5; }
+  .cbtn.where.sel { background: #1D9E75; color: white; border-color: #0F6E56; }
+  .cbtn.pos { background: #FBEAF0; color: #72243E; border-color: #ED93B1; }
+  .cbtn.pos.sel { background: #D4537E; color: white; border-color: #993556; }
+  .other-input { border: 2px solid #ED93B1; border-radius: 24px; padding: 9px 15px; font-size: 14px; background: white; color: #333; width: 150px; display: none; outline: none; }
+  .other-input:focus { border-color: #D4537E; }
+  .other-input.vis { display: inline-block; }
+  .save-btn { background: #7F77DD; color: white; border: none; border-radius: 16px; padding: 17px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: auto; letter-spacing: 0.5px; }
+  .save-btn:active { background: #534AB7; }
+  .save-btn:disabled { background: #B0ABE8; cursor: default; }
+  .nav-bar { display: flex; background: white; border-top: 1px solid #E8E4F8; padding-bottom: env(safe-area-inset-bottom); }
+  .nav-btn { flex: 1; padding: 12px; background: none; border: none; cursor: pointer; font-size: 11px; font-weight: 600; color: #999; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .nav-btn .ni { font-size: 24px; }
+  .nav-btn.active { color: #534AB7; }
+  .log-empty { text-align: center; color: #aaa; font-size: 15px; padding: 60px 20px; }
+  .log-empty .ei { font-size: 48px; display: block; margin-bottom: 12px; }
+  .log-card { border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; border: 2px solid; }
+  .log-card.c0 { background: #EEEDFE; border-color: #AFA9EC; }
+  .log-card.c1 { background: #E1F5EE; border-color: #5DCAA5; }
+  .log-card.c2 { background: #FBEAF0; border-color: #ED93B1; }
+  .log-card.c3 { background: #FFF8E7; border-color: #FAC775; }
+  .log-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .log-badge { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; background: #7F77DD; color: white; }
+  .log-date { font-size: 11px; color: #666; font-weight: 500; }
+  .log-row { font-size: 13px; color: #555; display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+  .log-row strong { color: #222; font-weight: 600; }
+  .log-count { font-size: 12px; color: #999; font-weight: 500; margin-bottom: 12px; }
+  .status-bar { background: #F0EEF9; border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #534AB7; font-weight: 500; text-align: center; display: none; }
+  .status-bar.show { display: block; }
+  .status-bar.err { background: #FBEAF0; color: #993556; }
+  .syncing { opacity: 0.6; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="screen active" id="screen-log">
+  <div class="header">
+    <h1>FND</h1>
+    <div class="sub">Episode tracker</div>
+  </div>
+  <div class="content">
+    <div id="log-status" class="status-bar"></div>
+    <div id="log-empty" class="log-empty">
+      <span class="ei">📋</span>
+      No episodes recorded yet.<br>Tap Record to add one.
+    </div>
+    <div id="log-list"></div>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn active" onclick="showScreen('log')"><span class="ni">📋</span>Log</button>
+    <button class="nav-btn" onclick="showScreen('record')"><span class="ni">➕</span>Record</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-record">
+  <div class="header"><h1>FND</h1></div>
+  <div class="content">
+    <div id="rec-status" class="status-bar"></div>
+    <div class="ts-box">
+      <span style="font-size:22px;">🕐</span>
+      <div>
+        <div class="section-label">Date &amp; time</div>
+        <div class="ts-val" id="ts-display"></div>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">What</div>
+      <div class="btn-group">
+        <button class="cbtn what sel">Episode</button>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Where</div>
+      <div class="btn-group" id="where-group">
+        <button class="cbtn where" onclick="selectBtn(this,'where-group','where')">🏠 Home</button>
+        <button class="cbtn where" onclick="selectBtn(this,'where-group','where')">🌳 Outside</button>
+        <button class="cbtn where" onclick="selectBtn(this,'where-group','where')">🚿 Bathroom</button>
+        <button class="cbtn where" onclick="selectOther(this,'where-group','where','where-inp')">✏️ Other</button>
+        <input class="other-input" id="where-inp" placeholder="describe location…" oninput="state.whereOther=this.value" />
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Position</div>
+      <div class="btn-group" id="pos-group">
+        <button class="cbtn pos" onclick="selectBtn(this,'pos-group','pos')">🧍 Standing</button>
+        <button class="cbtn pos" onclick="selectBtn(this,'pos-group','pos')">🪑 Sitting</button>
+        <button class="cbtn pos" onclick="selectBtn(this,'pos-group','pos')">🛏️ Lying down</button>
+        <button class="cbtn pos" onclick="selectOther(this,'pos-group','pos','pos-inp')">✏️ Other</button>
+        <input class="other-input" id="pos-inp" placeholder="describe position…" oninput="state.posOther=this.value" />
+      </div>
+    </div>
+    <button class="save-btn" id="save-btn" onclick="saveEp()">💾 Save episode</button>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="showScreen('log')"><span class="ni">📋</span>Log</button>
+    <button class="nav-btn active" onclick="showScreen('record')"><span class="ni">➕</span>Record</button>
+  </div>
+</div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby1xNfKkrTGhn50JL2wTciIt2bvc4UXk78cyLdzNhLwRVAhjOIPozzu-LTeSA5V4cew/exec';
+const state = { where: null, pos: null, whereOther: '', posOther: '' };
+let currentTs = null;
+const colors = ['c0','c1','c2','c3'];
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){
+  const dy=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let h=d.getHours(), ap=h>=12?'PM':'AM'; h=h%12||12;
+  return dy[d.getDay()]+' '+mo[d.getMonth()]+' '+d.getDate()+' · '+h+':'+pad(d.getMinutes())+' '+ap;
+}
+
+function showStatus(id, msg, isErr){
+  const el=document.getElementById(id);
+  el.textContent=msg;
+  el.className='status-bar show'+(isErr?' err':'');
+  if(!isErr) setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+function selectBtn(btn, groupId, key){
+  document.querySelectorAll('#'+groupId+' .cbtn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  state[key]=btn.textContent.replace(/[^\w\s]/g,'').trim();
+  const inp=document.getElementById(groupId==='where-group'?'where-inp':'pos-inp');
+  if(inp) inp.classList.remove('vis');
+}
+
+function selectOther(btn, groupId, key, inpId){
+  document.querySelectorAll('#'+groupId+' .cbtn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  state[key]='Other';
+  document.getElementById(inpId).classList.add('vis');
+  document.getElementById(inpId).focus();
+}
+
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  if(name==='record'){ currentTs=new Date(); document.getElementById('ts-display').textContent=fmtDate(currentTs); resetForm(); }
+  if(name==='log') loadLog();
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>{
+    if((name==='log'&&b.textContent.includes('Log'))||(name==='record'&&b.textContent.includes('Record'))) b.classList.add('active');
+  });
+}
+
+function resetForm(){
+  state.where=null; state.pos=null; state.whereOther=''; state.posOther='';
+  document.querySelectorAll('#where-group .cbtn, #pos-group .cbtn').forEach(b=>b.classList.remove('sel'));
+  ['where-inp','pos-inp'].forEach(id=>{ const el=document.getElementById(id); el.classList.remove('vis'); el.value=''; });
+  const sb=document.getElementById('save-btn'); sb.disabled=false; sb.textContent='💾 Save episode';
+  document.getElementById('rec-status').classList.remove('show');
+}
+
+function saveEp(){
+  const w=state.where==='Other'?(state.whereOther.trim()||'Other'):state.where;
+  const p=state.pos==='Other'?(state.posOther.trim()||'Other'):state.pos;
+  if(!w||!p){ showStatus('rec-status','Please select a location and position first.',true); return; }
+  const btn=document.getElementById('save-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+  const dt=fmtDate(currentTs||new Date());
+
+  const old=document.getElementById('jsonp-save');
+  if(old) old.remove();
+
+  window._fndSaveCallback = function(resp){
+    if(resp && resp.status==='ok'){
+      showStatus('rec-status','✅ Saved to Google Sheets!',false);
+      setTimeout(()=>showScreen('log'),1500);
+    } else {
+      showStatus('rec-status','❌ Could not save. Try again.',true);
+      btn.disabled=false; btn.textContent='💾 Save episode';
+    }
+  };
+
+  const params=new URLSearchParams({
+    callback:'_fndSaveCallback',
+    action:'save',
+    datetime:dt,
+    what:'Episode',
+    where:w,
+    position:p,
+    t:Date.now()
+  });
+
+  const script=document.createElement('script');
+  script.id='jsonp-save';
+  script.onerror=()=>{ showStatus('rec-status','❌ Could not save. Check your connection.',true); btn.disabled=false; btn.textContent='💾 Save episode'; };
+  script.src=SCRIPT_URL+'?'+params.toString();
+  document.body.appendChild(script);
+}
+
+// Use JSONP to bypass CORS for GET
+function loadLog(){
+  const list=document.getElementById('log-list');
+  const empty=document.getElementById('log-empty');
+  list.innerHTML='<div class="syncing" style="padding:12px;color:#999;font-size:13px;">⏳ Loading episodes…</div>';
+  empty.style.display='none';
+
+  // Remove any previous JSONP script
+  const old=document.getElementById('jsonp-script');
+  if(old) old.remove();
+
+  window._fndCallback = function(data){
+    const eps=[...data].reverse();
+    if(!eps.length){ empty.style.display='block'; list.innerHTML=''; return; }
+    list.innerHTML='<div class="log-count">'+eps.length+' episode'+(eps.length!==1?'s':'')+' recorded</div>'+
+      eps.map((ep,i)=>'<div class="log-card '+colors[i%4]+'">'+
+        '<div class="log-hdr"><span class="log-badge">'+(ep.what||'Episode')+'</span><span class="log-date">'+(ep.datetime||'')+'</span></div>'+
+        '<div class="log-row">📍 <strong>'+(ep.where||'')+'</strong></div>'+
+        '<div class="log-row">🧍 <strong>'+(ep.position||'')+'</strong></div>'+
+      '</div>').join('');
+  };
+
+  const script=document.createElement('script');
+  script.id='jsonp-script';
+  script.onerror=()=>showStatus('log-status','❌ Could not load log. Check your connection.',true);
+  script.src=SCRIPT_URL+'?callback=_fndCallback&t='+Date.now();
+  document.body.appendChild(script);
+}
+
+loadLog();
+</script>
+</body>
+</html>
